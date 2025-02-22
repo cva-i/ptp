@@ -1,0 +1,20 @@
+service: ptp
+
+provider:
+  name: aws
+  runtime: python3.13
+  stage: prod
+  region: eu-west-1
+
+package:
+  patterns:
+  - '!'
+  - src/
+  - handler.py
+
+functions:
+  api:
+  handler: handler.handler
+  events:
+  - http: ANY /
+  - http: ANY /{proxy+}
