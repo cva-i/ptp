@@ -1,20 +1,16 @@
-FROM python:3.13-slim-bookworm
+FROM public.ecr.aws/lambda/python:3.13
 
-RUN apt-get update && apt-get install -y \
-    poppler-utils \
-    && rm -rf /var/lib/apt/lists/*
-
+# Set a working directory
 WORKDIR /app
-ENV PYTHONPATH=/app/src
 
-RUN pip install poetry
-
+# Install Python dependencies
 COPY pyproject.toml poetry.lock* ./
-
+RUN pip install --no-cache-dir poetry
 RUN poetry config virtualenvs.create false
+RUN poetry install --no-dev
 
-RUN poetry install --only main --no-interaction --no-root
+# Copy the application code
+COPY src/ ./src/
 
-COPY src/ src/
-
-CMD ["uvicorn", "app.main:app", "--host", "0.0.0.0", "--port", "8000"]
+# Set the CMD to your handler (could also be done as a parameter override outside of the Dockerfile)
+CMD ["handler.handler"]
