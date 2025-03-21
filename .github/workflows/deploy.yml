@@ -1,0 +1,68 @@
+name: Deploy Lambda Service
+
+on:
+  push:
+    branches: [ master, main ]
+  workflow_dispatch:
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v3
+      
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v2
+      
+      - name: Configure AWS credentials
+        uses: aws-actions/configure-aws-credentials@v1
+        with:
+          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          aws-region: ${{ secrets.AWS_REGION }}
+      
+      - name: Login to Amazon ECR
+        id: login-ecr
+        uses: aws-actions/amazon-ecr-login@v1
+      
+      # Set ECR image URI as environment variables
+      - name: Set ECR image URIs
+        id: set-image-uris
+        run: |
+          ECR_REGISTRY="${{ secrets.AWS_ACCOUNT_ID }}.dkr.ecr.${{ secrets.AWS_REGION }}.amazonaws.com"
+          ECR_REPOSITORY="${{ secrets.ECR_REPOSITORY }}"
+          IMAGE_TAG_LATEST="$ECR_REGISTRY/$ECR_REPOSITORY:latest"
+          IMAGE_TAG_SHA="$ECR_REGISTRY/$ECR_REPOSITORY:${{ github.sha }}"
+          echo "image_uri_latest=$IMAGE_TAG_LATEST" >> $GITHUB_OUTPUT
+          echo "image_uri_sha=$IMAGE_TAG_SHA" >> $GITHUB_OUTPUT
+          echo "image_tags=$IMAGE_TAG_SHA,$IMAGE_TAG_LATEST" >> $GITHUB_OUTPUT
+      
+      - name: Build and push Docker image
+        uses: docker/build-push-action@v4
+        with:
+          context: .
+          file: ./Dockerfile.lambda
+          platforms: linux/arm64
+          push: true
+          tags: ${{ steps.set-image-uris.outputs.image_tags }}
+      
+      - name: Update Lambda function
+        run: |
+          aws lambda update-function-code \
+            --function-name ${{ secrets.LAMBDA_FUNCTION_NAME }} \
+            --image-uri ${{ steps.set-image-uris.outputs.image_uri_latest }} \
+            --region ${{ secrets.AWS_REGION }}
+      
+      - name: Wait for Lambda update
+        run: |
+          aws lambda wait function-updated \
+            --function-name ${{ secrets.LAMBDA_FUNCTION_NAME }} \
+            --region ${{ secrets.AWS_REGION }}
+      
+      - name: Test Lambda function
+        run: |
+          echo "Lambda function updated successfully!"
+          echo "Image deployed: ${{ steps.set-image-uris.outputs.image_uri_latest }}"
+          echo "Function URL: $(aws lambda get-function-url-config --function-name ${{ secrets.LAMBDA_FUNCTION_NAME }} --query 'FunctionUrl' --output text --region ${{ secrets.AWS_REGION }} || echo 'No function URL configured')"

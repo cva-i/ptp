@@ -1,7 +1,7 @@
 from fastapi import FastAPI, HTTPException, Response
 from pydantic import BaseModel
 from typing import List
-from app.utils import pdf_to_pngs
+from src.app.utils import pdf_to_pngs
 import base64
 import yaml
 
@@ -14,9 +14,11 @@ app = FastAPI(
     redoc_url="/redoc"
 )
 
+
 class PDFRequest(BaseModel):
     pdf: str
     dpi: int = 200
+
 
 @app.post("/convert", response_model=List[str])
 async def convert_pdf(request: PDFRequest):
@@ -34,6 +36,7 @@ async def convert_pdf(request: PDFRequest):
         return pdf_to_pngs(pdf_bytes, request.dpi)
     except Exception as e:
         raise HTTPException(status_code=400, detail=str(e))
+
 
 @app.get("/openapi.yaml", include_in_schema=False)
 async def get_openapi_yaml():
