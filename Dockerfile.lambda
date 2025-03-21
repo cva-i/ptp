@@ -13,5 +13,4 @@ RUN pip install --no-cache-dir poetry && \
     poetry config virtualenvs.create false && \
     poetry install --without dev --no-interaction --no-ansi
 
-ENTRYPOINT [ "/lambda-entrypoint.sh" ]
-CMD ["src.handler.handler"]
+CMD ["handler.handler"]
