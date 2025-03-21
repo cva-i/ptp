@@ -24,21 +24,8 @@ jobs:
           aws-region: ${{ vars.AWS_REGION }}
       
       - name: Login to Amazon ECR
-        id: login-ecr
         uses: aws-actions/amazon-ecr-login@v1
-      
-      # Set ECR image URI as environment variables
-      - name: Set ECR image URIs
-        id: set-image-uris
-        run: |
-          ECR_REGISTRY="${{ vars.AWS_ACCOUNT_ID }}.dkr.ecr.${{ vars.AWS_REGION }}.amazonaws.com"
-          ECR_REPOSITORY="${{ vars.ECR_REPOSITORY }}"
-          IMAGE_TAG_LATEST="$ECR_REGISTRY/$ECR_REPOSITORY:latest"
-          IMAGE_TAG_SHA="$ECR_REGISTRY/$ECR_REPOSITORY:${{ github.sha }}"
-          echo "image_uri_latest=$IMAGE_TAG_LATEST" >> $GITHUB_OUTPUT
-          echo "image_uri_sha=$IMAGE_TAG_SHA" >> $GITHUB_OUTPUT
-          echo "image_tags=$IMAGE_TAG_SHA,$IMAGE_TAG_LATEST" >> $GITHUB_OUTPUT
-      
+
       - name: Build and push Docker image
         uses: docker/build-push-action@v4
         with:
@@ -46,23 +33,32 @@ jobs:
           file: ./Dockerfile.lambda
           platforms: linux/arm64
           push: true
-          tags: ${{ steps.set-image-uris.outputs.image_tags }}
-      
+          tags: |
+            ${{ vars.AWS_ACCOUNT_ID }}.dkr.ecr.${{ vars.AWS_REGION }}.amazonaws.com/${{ vars.ECR_REPOSITORY }}:latest
+            ${{ vars.AWS_ACCOUNT_ID }}.dkr.ecr.${{ vars.AWS_REGION }}.amazonaws.com/${{ vars.ECR_REPOSITORY }}:${{ github.sha }}
+
       - name: Update Lambda function
         run: |
+          # Construct URI directly from variables to avoid masking
+          IMAGE_URI="${{ vars.AWS_ACCOUNT_ID }}.dkr.ecr.${{ vars.AWS_REGION }}.amazonaws.com/${{ vars.ECR_REPOSITORY }}:latest"
+          
+          # Force ARM64 architecture to prevent manifest errors
+          aws lambda update-function-configuration \
+            --function-name ${{ vars.LAMBDA_FUNCTION_NAME }} \
+            --architectures arm64 \
+            --region ${{ vars.AWS_REGION }}
+          
+          # Update function with visible URI
+          echo "Updating Lambda with image: $IMAGE_URI"
           aws lambda update-function-code \
-            --function-name ${{ secrets.LAMBDA_FUNCTION_NAME }} \
-            --image-uri ${{ steps.set-image-uris.outputs.image_uri_latest }} \
+            --function-name ${{ vars.LAMBDA_FUNCTION_NAME }} \
+            --image-uri "$IMAGE_URI" \
             --region ${{ vars.AWS_REGION }}
-      
-      - name: Wait for Lambda update
-        run: |
-          aws lambda wait function-updated \
-            --function-name ${{ secrets.LAMBDA_FUNCTION_NAME }} \
-            --region ${{ vars.AWS_REGION }}
-      
+
       - name: Test Lambda function
         run: |
+          VISIBLE_URI="${{ vars.AWS_ACCOUNT_ID }}.dkr.ecr.${{ vars.AWS_REGION }}.amazonaws.com/${{ vars.ECR_REPOSITORY }}:latest"
+          
           echo "Lambda function updated successfully!"
-          echo "Image deployed: ${{ steps.set-image-uris.outputs.image_uri_latest }}"
-          echo "Function URL: $(aws lambda get-function-url-config --function-name ${{ secrets.LAMBDA_FUNCTION_NAME }} --query 'FunctionUrl' --output text --region ${{ vars.AWS_REGION }} || echo 'No function URL configured')"
+          echo "Image deployed: $VISIBLE_URI"
+          echo "Function URL: $(aws lambda get-function-url-config --function-name ${{ vars.LAMBDA_FUNCTION_NAME }} --query 'FunctionUrl' --output text --region ${{ vars.AWS_REGION }} || echo 'No function URL configured')"
