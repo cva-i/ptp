@@ -40,25 +40,25 @@ jobs:
       - name: Build and push Docker image
         id: build-image-and-push-to-ecr
         run: |
-          docker build -t ${{ secrets.LAMBDA_FUNCTION_NAME }} --file Dockerfile.lambda . 
-          docker tag ${{ secrets.LAMBDA_FUNCTION_NAME }}:latest ${{ steps.set-image-uris.outputs.image_uri_latest }}
+          docker build -t ${{ vars.LAMBDA_FUNCTION_NAME }} --file Dockerfile.lambda . 
+          docker tag ${{ vars.LAMBDA_FUNCTION_NAME }}:latest ${{ steps.set-image-uris.outputs.image_uri_latest }}
           docker push ${{ steps.set-image-uris.outputs.image_uri_latest }}
 
       - name: Update Lambda function
         run: |
           aws lambda update-function-code \
-            --function-name ${{ secrets.LAMBDA_FUNCTION_NAME }} \
+            --function-name ${{ vars.LAMBDA_FUNCTION_NAME }} \
             --image-uri ${{ steps.set-image-uris.outputs.image_uri_latest }} \
             --region ${{ vars.AWS_REGION }}
 
       - name: Wait for Lambda update
         run: |
           aws lambda wait function-updated \
-            --function-name ${{ secrets.LAMBDA_FUNCTION_NAME }} \
+            --function-name ${{ vars.LAMBDA_FUNCTION_NAME }} \
             --region ${{ vars.AWS_REGION }}
 
       - name: Test Lambda function
         run: |
           echo "Lambda function updated successfully!"
           echo "Image deployed: ${{ steps.set-image-uris.outputs.image_uri_latest }}"
-          echo "Function URL: $(aws lambda get-function-url-config --function-name ${{ secrets.LAMBDA_FUNCTION_NAME }} --query 'FunctionUrl' --output text --region ${{ vars.AWS_REGION }} || echo 'No function URL configured')"
+          echo "Function URL: $(aws lambda get-function-url-config --function-name ${{ vars.LAMBDA_FUNCTION_NAME }} --query 'FunctionUrl' --output text --region ${{ vars.AWS_REGION }} || echo 'No function URL configured')"
