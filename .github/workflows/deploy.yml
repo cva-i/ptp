@@ -1,3 +1,4 @@
+
 name: Deploy Lambda Service
 
 on:
@@ -41,12 +42,18 @@ jobs:
           echo "image_uri_latest=$IMAGE_TAG_LATEST" >> $GITHUB_OUTPUT
           echo "ecr_repository=$ECR_REPOSITORY" >> $GITHUB_OUTPUT
 
-      - name: Build and push Docker image
+      - name: Build Docker image
         id: build-image-and-push-to-ecr
         run: |
-          docker buildx build --platform linux/arm64 -t ${{ vars.LAMBDA_FUNCTION_NAME }} --file Dockerfile.lambda . 
-          docker tag ${{ vars.LAMBDA_FUNCTION_NAME }}:latest ${{ steps.set-image-uris.outputs.image_uri_latest }}
+          docker buildx build --platform linux/arm64 -t ${{ vars.LAMBDA_FUNCTION_NAME }} --file Dockerfile.lambda .
+          docker tag ${{ vars.LAMBDA_FUNCTION_NAME }}:latest r{{ steps.set-image-uris.outputs.image_uri_latest }}
+
+      - name: Push Docker image
+        id: push-docker-image
+        run: | 
+          echo "Pushing ${{ steps.set-image-uris.outputs.image_uri_latest }}"
           docker push ${{ steps.set-image-uris.outputs.image_uri_latest }}
+
 
       - name: Update Lambda function
         run: |
