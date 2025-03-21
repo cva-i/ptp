@@ -34,33 +34,29 @@ jobs:
           ECR_REGISTRY="${{ vars.AWS_ACCOUNT_ID }}.dkr.ecr.${{ vars.AWS_REGION }}.amazonaws.com"
           ECR_REPOSITORY="${{ vars.ECR_REPOSITORY }}"
           IMAGE_TAG_LATEST="$ECR_REGISTRY/$ECR_REPOSITORY:latest"
-          IMAGE_TAG_SHA="$ECR_REGISTRY/$ECR_REPOSITORY:${{ github.sha }}"
           echo "image_uri_latest=$IMAGE_TAG_LATEST" >> $GITHUB_OUTPUT
-          echo "image_uri_sha=$IMAGE_TAG_SHA" >> $GITHUB_OUTPUT
-          echo "image_tags=$IMAGE_TAG_SHA,$IMAGE_TAG_LATEST" >> $GITHUB_OUTPUT
+          echo "ecr_repository=$ECR_REPOSITORY" >> $GITHUB_OUTPUT
       
       - name: Build and push Docker image
-        uses: docker/build-push-action@v4
-        with:
-          context: .
-          file: ./Dockerfile.lambda
-          platforms: linux/arm64
-          push: true
-          tags: ${{ steps.set-image-uris.outputs.image_tags }}
-      
+        id: build-image-and-push-to-ecr
+        run: |
+          docker build -t ${{ secrets.LAMBDA_FUNCTION_NAME }} --file Dockerfile.lambda . 
+          docker tag ${{ secrets.LAMBDA_FUNCTION_NAME }}:latest ${{ steps.set-image-uris.outputs.image_uri_latest }}
+          docker push ${{ steps.set-image-uris.outputs.image_uri_latest }}
+
       - name: Update Lambda function
         run: |
           aws lambda update-function-code \
             --function-name ${{ secrets.LAMBDA_FUNCTION_NAME }} \
             --image-uri ${{ steps.set-image-uris.outputs.image_uri_latest }} \
             --region ${{ vars.AWS_REGION }}
-      
+
       - name: Wait for Lambda update
         run: |
           aws lambda wait function-updated \
             --function-name ${{ secrets.LAMBDA_FUNCTION_NAME }} \
             --region ${{ vars.AWS_REGION }}
-      
+
       - name: Test Lambda function
         run: |
           echo "Lambda function updated successfully!"
