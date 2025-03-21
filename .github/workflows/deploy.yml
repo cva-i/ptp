@@ -1,19 +1,16 @@
-
 name: Deploy Lambda Service
 
 on:
   push:
-    branches: [ master, main ]
+    branches: [master, main]
   workflow_dispatch:
 
 jobs:
   deploy:
-
     runs-on: ubuntu-latest
 
     permissions:
       deployments: write
-
     steps:
       - name: Checkout code
         uses: actions/checkout@v3
@@ -42,18 +39,21 @@ jobs:
           echo "image_uri_latest=$IMAGE_TAG_LATEST" >> $GITHUB_OUTPUT
           echo "ecr_repository=$ECR_REPOSITORY" >> $GITHUB_OUTPUT
 
+      - name: Create ECR Repository (if it doesn't exist)
+        run: |
+          aws ecr describe-repositories --repository-names ${{ steps.set-image-uris.outputs.ecr_repository }} --region ${{ vars.AWS_REGION }} || aws ecr create-repository --repository-name ${{ steps.set-image-uris.outputs.ecr_repository }} --region ${{ vars.AWS_REGION }}
+
       - name: Build Docker image
         id: build-image-and-push-to-ecr
         run: |
           docker buildx build --platform linux/arm64 -t ${{ vars.LAMBDA_FUNCTION_NAME }} --file Dockerfile.lambda .
-          docker tag ${{ vars.LAMBDA_FUNCTION_NAME }}:latest r{{ steps.set-image-uris.outputs.image_uri_latest }}
+          docker tag ${{ vars.LAMBDA_FUNCTION_NAME }}:latest ${{ steps.set-image-uris.outputs.image_uri_latest }}
 
       - name: Push Docker image
         id: push-docker-image
-        run: | 
+        run: |
           echo "Pushing ${{ steps.set-image-uris.outputs.image_uri_latest }}"
           docker push ${{ steps.set-image-uris.outputs.image_uri_latest }}
-
 
       - name: Update Lambda function
         run: |
