@@ -1,0 +1,14 @@
+#! Dockerfile
+
+FROM public.ecr.aws/lambda/python:3.13
+
+COPY src/ ${LAMBDA_TASK_ROOT}/src/
+COPY pyproject.toml poetry.lock ${LAMBDA_TASK_ROOT}/
+
+RUN microdnf install -y poppler poppler-utils
+
+RUN pip install --no-cache-dir poetry && \
+    poetry config virtualenvs.create false && \
+    poetry install --without dev --no-interaction --no-ansi
+
+CMD ["src.handler.handler"]
