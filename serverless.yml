@@ -1,20 +1,30 @@
-service: ptp
+service: ptp-service
+
+frameworkVersion: '4'
 
 provider:
   name: aws
-  runtime: python3.13
-  stage: prod
-  region: eu-west-1
-
-package:
-  patterns:
-  - '!'
-  - src/
-  - handler.py
+  region: ${opt:region, 'eu-central-1'}
+  ecr:
+    images:
+      ptp-lambda:
+        path: ./
+        file: Dockerfile.lambda
+        platform: arm64
 
 functions:
   api:
-  handler: handler.handler
-  events:
-  - http: ANY /
-  - http: ANY /{proxy+}
+    image:
+      name: ptp-lambda
+      command: ["src.handler.handler"]
+    timeout: 30
+    memorySize: 1024
+    architecture: arm64
+    url: true
+    environment:
+      LOG_LEVEL: INFO
+
+custom:
+  esbuild:
+    bundle: true
+    minify: false
