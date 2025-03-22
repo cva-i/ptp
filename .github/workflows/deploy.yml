@@ -51,6 +51,7 @@ jobs:
             --platform linux/arm64 \
             --tag ${{ steps.set-image-uris.outputs.image_uri_latest }} \
             --file Dockerfile.lambda \
+            --provenance=false \
             --output=type=registry,oci-mediatypes=false \
             .
 
