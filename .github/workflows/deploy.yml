@@ -43,15 +43,15 @@ jobs:
         run: |
           aws ecr describe-repositories --repository-names ${{ steps.set-image-uris.outputs.ecr_repository }} --region ${{ vars.AWS_REGION }} || aws ecr create-repository --repository-name ${{ steps.set-image-uris.outputs.ecr_repository }} --region ${{ vars.AWS_REGION }}
 
+      
       - name: Build and push Docker image
         id: build-image-and-push-to-ecr
         run: |
-          # Build and push in a single command
           docker buildx build \
             --platform linux/arm64 \
             --tag ${{ steps.set-image-uris.outputs.image_uri_latest }} \
             --file Dockerfile.lambda \
-            --push \
+            --output=type=registry,oci-mediatypes=false \
             .
 
       - name: Update Lambda function
